@@ -1,0 +1,48 @@
+#!/bin/bash
+# Since it is just stupid script to automate data sync with phone, all settings are just variables. It can surely be easily converted to use parameters, but this just suits my usage best.
+# I use this script to keep music on phone in sync with my PC (and NAS).
+
+# Phone IP address on your home network - static DHCP reservation strongly suggested!
+PHONE_IPADDR='10.3.0.150'
+
+# Check storage name with some file manager like Total Commander - IMPORTANT mainly on devioces where multiple storages are available (internal storage + sdcard, ...)
+#PHONE_STORAGE_NAME='emulated/0'
+PHONE_STORAGE_NAME='9C33-6BBD'
+
+PHONE_MUSICDIR="Music"
+MUSIC_LOCATION="/home/user/Music"
+
+SSH_CMD='ssh -p 8022'
+
+# Sync is done via SSH (since today's flagship phones does not have sdcards for some stupid reason)
+# Setup termux and SSH on phone: https://howtos.davidsebek.com/android-rsync-termux.html
+
+
+${SSH_CMD} "${PHONE_IPADDR}" exit < /dev/null
+TARGET_TEST=${?}
+if [ ${TARGET_TEST} -ne 0 ]
+then
+  echo "Phone is not available on network. Please check if phone is connected, sshd on phone is started and phone has correct IP addres = ${PHONE_IPADDR}."
+  exit 1
+fi
+
+${SSH_CMD} "${PHONE_IPADDR}" test -d "/storage/${PHONE_STORAGE_NAME}/${PHONE_MUSICDIR}" < /dev/null
+TARGET_TEST=${?}
+if [ ${TARGET_TEST} -ne 0 ]
+then
+  echo "Target directory /storage/${PHONE_STORAGE_NAME}/${PHONE_MUSICDIR} does not exists on phone."
+  exit 1
+fi
+
+echo "Syncing data with phone. Please wait..."
+
+# RSYNC - push data with deletion (data deleted on PC are removed also from phone)
+# rsync -rlgou --delete-during --rsh='ssh -p 8022' "${MUSIC_LOCATION}/" "${PHONE_IPADDR}:storage/sdcard/${PHONE_MUSICDIR}/"
+# rsync -rlgou --dry-run --verbose --delete-during --rsh="${SSH_CMD}" "${MUSIC_LOCATION}/" "${PHONE_IPADDR}:/storage/${PHONE_STORAGE_NAME}/${PHONE_MUSICDIR}/"
+rsync -rlgou --delete-during --rsh="${SSH_CMD}" "${MUSIC_LOCATION}/" "${PHONE_IPADDR}:/storage/${PHONE_STORAGE_NAME}/${PHONE_MUSICDIR}/"
+if [ ! $? -eq 0 ]
+then
+	echo "Something went wrong during synchronization. Pease check rsync output above."
+	exit 1
+fi
+echo "Synchronization finished!"
